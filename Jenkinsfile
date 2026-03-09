@@ -5,10 +5,6 @@
 pipeline {
     agent any
 
-    // ─────────────────────────────────────────
-    // PARAMETERS
-    // Choose Terraform action from Jenkins UI
-    // ─────────────────────────────────────────
     parameters {
         choice(
             name: 'TERRAFORM_ACTION',
@@ -18,21 +14,20 @@ pipeline {
     }
 
     environment {
-        AWS_REGION     = "us-east-1"
-        AWS_ACCOUNT_ID = "204298492808"
-        ECR_REPO_NAME  = "bhagyashil/web"
-        IMAGE_TAG      = "${env.BUILD_NUMBER}"
-        ECR_REGISTRY   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        ECR_IMAGE_URI  = "${ECR_REGISTRY}/${ECR_REPO_NAME}"
-         // ↓ ADD THESE 2 LINES ↓
-    AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        AWS_REGION            = "us-east-1"
+        AWS_ACCOUNT_ID        = "204298492808"
+        ECR_REPO_NAME         = "bhagyashil/web"
+        IMAGE_TAG             = "${env.BUILD_NUMBER}"
+        ECR_REGISTRY          = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_IMAGE_URI         = "${ECR_REGISTRY}/${ECR_REPO_NAME}"
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
 
     stages {
 
         // ─────────────────────────────────────────
-        // STAGE 1: Checkout Code from GitLab
+        // STAGE 1: Checkout Code
         // ─────────────────────────────────────────
         stage('Checkout Code') {
             steps {
@@ -44,30 +39,23 @@ pipeline {
 
         // ─────────────────────────────────────────
         // STAGE 2: ECR Login
-        // Skipped if Terraform destroy
         // ─────────────────────────────────────────
         stage('ECR Login') {
             when {
                 expression { params.TERRAFORM_ACTION != 'destroy' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Logging in to Amazon ECR =========="
-                        aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                        echo "ECR Login successful!"
-                    """
-                }
+                sh """
+                    echo "========== Logging in to Amazon ECR =========="
+                    aws ecr get-login-password --region ${AWS_REGION} | \
+                    docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                    echo "ECR Login successful!"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 3: Docker Build
-        // Skipped if Terraform destroy
         // ─────────────────────────────────────────
         stage('Docker Build') {
             when {
@@ -86,151 +74,114 @@ pipeline {
 
         // ─────────────────────────────────────────
         // STAGE 4: Push to ECR
-        // Skipped if Terraform destroy
         // ─────────────────────────────────────────
         stage('Push to ECR') {
             when {
                 expression { params.TERRAFORM_ACTION != 'destroy' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Pushing Image to ECR =========="
-                        docker push ${ECR_IMAGE_URI}:${IMAGE_TAG}
-                        docker push ${ECR_IMAGE_URI}:latest
-                        echo "Image pushed: ${ECR_IMAGE_URI}:${IMAGE_TAG}"
-                    """
-                }
+                sh """
+                    echo "========== Pushing Image to ECR =========="
+                    docker push ${ECR_IMAGE_URI}:${IMAGE_TAG}
+                    docker push ${ECR_IMAGE_URI}:latest
+                    echo "Image pushed: ${ECR_IMAGE_URI}:${IMAGE_TAG}"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 5: Terraform Init
-        // Always runs for all actions
         // ─────────────────────────────────────────
         stage('Terraform Init') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Terraform Init =========="
-                        cd dev
-                        terraform init
-                        echo "Terraform init successful!"
-                    """
-                }
+                sh """
+                    echo "========== Terraform Init =========="
+                    cd dev
+                    terraform init
+                    echo "Terraform init successful!"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 6: Terraform Plan
-        // Runs when action = plan OR apply
         // ─────────────────────────────────────────
         stage('Terraform Plan') {
             when {
                 expression { params.TERRAFORM_ACTION == 'plan' || params.TERRAFORM_ACTION == 'apply' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Terraform Plan =========="
-                        cd dev
-                        terraform plan \
-                            -var="ecr_image_uri=${ECR_IMAGE_URI}" \
-                            -var="image_tag=${IMAGE_TAG}" \
-                            -out=tfplan
-                        echo "Terraform plan successful!"
-                    """
-                }
+                sh """
+                    echo "========== Terraform Plan =========="
+                    cd dev
+                    terraform plan \
+                        -var="ecr_image_uri=${ECR_IMAGE_URI}" \
+                        -var="image_tag=${IMAGE_TAG}" \
+                        -out=tfplan
+                    echo "Terraform plan successful!"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 7: Terraform Apply
-        // Runs only when action = apply
         // ─────────────────────────────────────────
         stage('Terraform Apply') {
             when {
                 expression { params.TERRAFORM_ACTION == 'apply' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Terraform Apply =========="
-                        cd dev
-                        terraform apply -auto-approve tfplan
-                        echo "Infrastructure deployed successfully!"
-                    """
-                }
+                sh """
+                    echo "========== Terraform Apply =========="
+                    cd dev
+                    terraform apply -auto-approve tfplan
+                    echo "Infrastructure deployed successfully!"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 8: Terraform Destroy
-        // Runs only when action = destroy
         // ─────────────────────────────────────────
         stage('Terraform Destroy') {
             when {
                 expression { params.TERRAFORM_ACTION == 'destroy' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Terraform Destroy =========="
-                        cd dev
-                        terraform destroy \
-                            -var="ecr_image_uri=${ECR_IMAGE_URI}" \
-                            -var="image_tag=${IMAGE_TAG}" \
-                            -auto-approve
-                        echo "Infrastructure destroyed successfully!"
-                    """
-                }
+                sh """
+                    echo "========== Terraform Destroy =========="
+                    cd dev
+                    terraform destroy \
+                        -var="ecr_image_uri=${ECR_IMAGE_URI}" \
+                        -var="image_tag=${IMAGE_TAG}" \
+                        -auto-approve
+                    echo "Infrastructure destroyed successfully!"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 9: Deploy to ECS
-        // Runs only when action = apply
         // ─────────────────────────────────────────
         stage('Deploy to ECS') {
             when {
                 expression { params.TERRAFORM_ACTION == 'apply' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    sh """
-                        echo "========== Deploying to ECS =========="
-                        aws ecs update-service \
-                            --cluster gitlab-ecs-cluster \
-                            --service gitlab-ecs-service \
-                            --force-new-deployment \
-                            --region ${AWS_REGION}
-                        echo "ECS deployment triggered!"
-                    """
-                }
+                sh """
+                    echo "========== Deploying to ECS =========="
+                    aws ecs update-service \
+                        --cluster gitlab-ecs-cluster \
+                        --service gitlab-ecs-service \
+                        --force-new-deployment \
+                        --region ${AWS_REGION}
+                    echo "ECS deployment triggered!"
+                """
             }
         }
 
         // ─────────────────────────────────────────
         // STAGE 10: Cleanup
-        // Skipped if Terraform destroy
         // ─────────────────────────────────────────
         stage('Cleanup') {
             when {
@@ -248,9 +199,6 @@ pipeline {
         }
     }
 
-    // ─────────────────────────────────────────
-    // POST ACTIONS
-    // ─────────────────────────────────────────
     post {
         success {
             echo """
