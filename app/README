@@ -1,0 +1,68 @@
+# 🐍 Flask Web Application
+
+This is a simple Python Flask web application used for demonstrating Docker containerization and AWS ECS deployment through Jenkins CI/CD.
+
+---
+
+## Features
+
+- Flask Web Server
+- Dockerized Application
+- Production Ready
+- ECS Compatible
+
+---
+
+## Technologies
+
+- Python
+- Flask
+- Docker
+
+---
+
+## Run Locally
+
+Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Run
+
+```bash
+python app.py
+```
+
+---
+
+## Docker
+
+Build Image
+
+```bash
+docker build -t flask-app .
+```
+
+Run Container
+
+```bash
+docker run -d -p 5000:5000 flask-app
+```
+
+---
+
+## Folder Structure
+
+```
+app/
+
+Dockerfile
+
+app.py
+
+requirements.txt
+
+templates/
+```
