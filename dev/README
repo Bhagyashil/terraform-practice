@@ -1,0 +1,118 @@
+# ☁️ AWS Infrastructure using Terraform
+
+This folder contains Terraform code used to provision AWS infrastructure for deploying containerized applications.
+
+---
+
+## Infrastructure Components
+
+- VPC
+- Public Subnets
+- Internet Gateway
+- Route Tables
+- Security Groups
+- Application Load Balancer
+- ECS Cluster
+- ECS Service
+- Auto Scaling Group
+
+---
+
+## Files
+
+| File | Purpose |
+|------|----------|
+| provider.tf | AWS Provider |
+| subnet.tf | Public Subnets |
+| igw.tf | Internet Gateway |
+| route.tf | Route Tables |
+| security-group.tf | Security Groups |
+| alb.tf | Application Load Balancer |
+| ecs.tf | ECS Cluster & Service |
+| asg.tf | Auto Scaling |
+| output.tf | Terraform Outputs |
+
+---
+
+## Initialize Terraform
+
+```bash
+terraform init
+```
+
+---
+
+## Validate
+
+```bash
+terraform validate
+```
+
+---
+
+## Plan
+
+```bash
+terraform plan
+```
+
+---
+
+## Apply
+
+```bash
+terraform apply
+```
+
+---
+
+## Destroy
+
+```bash
+terraform destroy
+```
+
+---
+
+## Infrastructure Flow
+
+```
+Terraform
+     │
+     ▼
+AWS Provider
+     │
+     ▼
+VPC
+     │
+     ▼
+Subnets
+     │
+     ▼
+Internet Gateway
+     │
+     ▼
+Route Tables
+     │
+     ▼
+Security Groups
+     │
+     ▼
+Application Load Balancer
+     │
+     ▼
+ECS Cluster
+     │
+     ▼
+Auto Scaling
+```
+
+---
+
+## Benefits
+
+- Infrastructure as Code
+- Reproducible Deployments
+- Automated AWS Resource Provisioning
+- Version Controlled Infrastructure
+- Scalable Architecture
